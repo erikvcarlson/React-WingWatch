@@ -1,0 +1,25 @@
+version: "3.8"
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    networks:
+      my_network:
+        ipv4_address: 192.168.1.100  # Assign static IP if needed
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    networks:
+      my_network:
+        ipv4_address: 192.168.1.101
+
+networks:
+  my_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.1.0/24  # Custom subnet to avoid conflicts
