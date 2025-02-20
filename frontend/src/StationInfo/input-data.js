@@ -12,7 +12,7 @@ import FormControl from '@mui/material/FormControl';
 import { useIndexedDB, getAllData } from "../indexeddb/useIndexedDB";
 
 export default function InputStationData({ refreshMarkers }) {
-    const { addData } = useIndexedDB("yourStoreName");
+    const { putData } = useIndexedDB("yourStoreName");
 
     const [stationData, setStationData] = useState({
         stationName: '',
@@ -39,18 +39,32 @@ export default function InputStationData({ refreshMarkers }) {
         fetchStations();
     }, []);
 
-    const handleChangeAddPattern = (e) => {
-        const selectedStation = stations.find(station => station.id === e.target.value);
-        if (selectedStation) {
-            setStationData({
-                ...stationData,
-                stationName: selectedStation.id,
-                latitude: selectedStation.latitude,
-                longitude: selectedStation.longitude,
-                antennas: selectedStation.antennas
-            });
+    const handleChangeAddPattern = async (e) => {
+        const selectedStationId = e.target.value;
+    
+        try {
+            // Fetch the latest stations from IndexedDB
+            const updatedStations = await getAllData("yourStoreName");
+            setStations(updatedStations);
+    
+            // Find the selected station
+            const selectedStation = updatedStations.find(station => station.id === selectedStationId);
+    
+            if (selectedStation) {
+                setStationData(prevState => ({
+                    ...prevState,
+                    stationName: selectedStation.id,
+                    latitude: selectedStation.latitude,
+                    longitude: selectedStation.longitude,
+                    antennas: selectedStation.antennas 
+                }));
+            }
+        } catch (error) {
+            console.error("Error fetching updated stations:", error);
         }
     };
+    
+    
 
     const handleChangeStationInit = (e) => {
         setStationData({ ...stationData, [e.target.name]: e.target.value });
@@ -66,7 +80,7 @@ export default function InputStationData({ refreshMarkers }) {
             console.error("Error: Name, Latitude, and Longitude are required.");
             return;
         }
-
+    
         const dataToSave = {
             id: stationData.stationName,
             latitude: parseFloat(stationData.latitude),
@@ -74,12 +88,16 @@ export default function InputStationData({ refreshMarkers }) {
             antennaNumber: stationData.antennaNumber,
             antennas: '[]' // Ensure empty list on initialization
         };
-
+    
         try {
-            await addData(dataToSave);
+            await putData(dataToSave);
             console.log("Data saved:", dataToSave);
             refreshMarkers(); // Refresh map after saving
-            setStations([...stations, dataToSave]); // Update dropdown list
+            
+            // Re-fetch updated stations from IndexedDB
+            const updatedStations = await getAllData("yourStoreName");
+            setStations(updatedStations);
+    
         } catch (error) {
             console.error("Error saving data:", error);
         }
@@ -90,22 +108,30 @@ export default function InputStationData({ refreshMarkers }) {
     
         const formData = new FormData();
         formData.append("stationName", stationData.stationName);
-        formData.append("latitude", parseFloat(stationData.latitude));  // Convert to float
-        formData.append("longitude", parseFloat(stationData.longitude)); // Convert to float
-        formData.append("antennaNumber", parseInt(stationData.antennaNumber, 10)); // Convert to integer
-        formData.append("antennas",stationData.antennas);
+        formData.append("latitude", parseFloat(stationData.latitude));  
+        formData.append("longitude", parseFloat(stationData.longitude)); 
+        formData.append("antennaNumber", parseInt(stationData.antennaNumber, 10));
+        formData.append("antennas", JSON.stringify(stationData.antennas));
+
 
         formData.append("csv_file", stationData.csvFile);
 
-        console.log("Submitting FormData...");
 
+
+        console.log("Selected File:", stationData.csvFile);
+        if (stationData.csvFile) {
+            console.log("File Name:", stationData.csvFile.name);
+            console.log("File Type:", stationData.csvFile.type);
+            console.log("File Size:", stationData.csvFile.size);
+}
+    
+        console.log("Submitting FormData...");
+    
         for (let pair of formData.entries()) {
             console.log(pair[0] + ': ' + pair[1]);
         }
     
-
         try {          
-
             const response = await fetch("http://localhost:8000/process-csv/", {
                 method: "POST",
                 body: formData,
@@ -117,7 +143,7 @@ export default function InputStationData({ refreshMarkers }) {
             console.log("Processed Data:", data);
     
             // Save processed data
-            await addData({
+            await putData({
                 id: data.stationName,
                 latitude: data.latitude,
                 longitude: data.longitude,
@@ -125,7 +151,6 @@ export default function InputStationData({ refreshMarkers }) {
             });
     
             refreshMarkers();
-    
         } catch (error) {
             console.error("Error submitting CSV:", error);
         }

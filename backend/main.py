@@ -40,13 +40,26 @@ def object_to_base64_string(obj):
     return base64_string
 
 
+def safe_literal_eval(value):
+    try:
+        result = ast.literal_eval(value)
+        if isinstance(result, list):
+            return result 
+        else:
+            print("!! WARNING !! \n safe_literal_eval is returning an empty list")
+            return([])
+    except (SyntaxError, ValueError):
+        return []
+
+
+
 @app.post("/process-csv/")
 async def process_csv(
     stationName: str = Form(...),
     latitude: float = Form(...),
     longitude: float = Form(...),
+    antennaNumber: int = Form(...),
     antennas: str = Form(...),  
-    antennaNumber: str = Form(...),  
     csv_file: UploadFile = File(...)
 ):
     print(f"Received Data: stationName={stationName}, latitude={latitude}, longitude={longitude}, antennas={antennas}, antennaNumber={antennaNumber}")
@@ -55,27 +68,54 @@ async def process_csv(
 
         print(f"Converting Antennas to a list")
 
+        print(antennas)
         # Convert antennas from JSON string to list
-        antennas_list = ast.literal_eval(antennas) 
 
+        antennas_list = safe_literal_eval(antennas) 
+
+        print(type(antennas_list))
         print(f"Antennas converted")
 
-        # Read CSV file into Pandas DataFrame
-        contents = await csv_file.read()
+        try:
+            print(f"Checking file: {csv_file.filename}")
+            
+            if not csv_file:
+                return JSONResponse({"error": "No file uploaded"}, status_code=400)
+
+            print(f"Reading CSV file")
+            contents = await csv_file.read()
+            print(f"Read {len(contents)} bytes")
+
+            df = pd.read_csv(io.StringIO(contents.decode("utf-8")))
+            print(f"CSV successfully loaded into DataFrame with {df.shape[0]} rows and {df.shape[1]} columns")
+        except Exception as e:
+            print(f"Error reading CSV file: {str(e)}")
+
         pattern = pd.read_csv(io.StringIO(contents.decode("utf-8")))
 
+        print(f"Pattern read")
+
         # Create station
-        Station_1 = station.Station(stationName, latitude, longitude)
+        Station_1 = station.Station(stationName, latitude, longitude,antennas=antennas_list)
+        
+        print(f"Station created")
 
         # Create and assign antenna
         a1 = antenna.Antenna(antennaNumber, 'test', 0, 0)
         a1.assign_pattern(pattern)
 
-        Station_1.add_antenna(a1)
+
+        print(f"Antenna created and pattern assigned")
+
+        print(f"Adding antenna {int(antennaNumber)} to station")
+        Station_1.add_antenna(a1,antenna_number=int(antennaNumber))
+        print(f"Antenna added to station")
 
         for i in range(len(Station_1.antennas)): 
             if not isinstance(Station_1.antennas[i], str):
                 Station_1.antennas[i] = object_to_base64_string(Station_1.antennas[i])
+        print(f"Antennas Patterns processed to Base64")
+
 
         # Return processed data along with station info
         return JSONResponse({
@@ -88,6 +128,10 @@ async def process_csv(
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
+
+
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000,limit_max_requests=500000000)

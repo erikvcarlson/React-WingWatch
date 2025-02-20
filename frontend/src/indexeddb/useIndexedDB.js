@@ -18,27 +18,26 @@ export const useIndexedDB = (storeName) => {
     openDB();
   }, []);
 
-  const addData = (data) => {
-    if (db) {
+  // Use put() instead of add() to avoid "Key already exists" error
+  const putData = (data) => {
+    if (!db) return Promise.reject("Database not initialized");
+
+    return new Promise((resolve, reject) => {
       const transaction = db.transaction([storeName], "readwrite");
       const store = transaction.objectStore(storeName);
-      const request = store.add(data);
+      const request = store.put(data); // put() will insert or update data
 
-      return new Promise((resolve, reject) => {
-        request.onsuccess = (event) => {
-          resolve(event.target.result);
-        };
+      request.onsuccess = (event) => {
+        resolve(event.target.result);
+      };
 
-        request.onerror = (event) => {
-          reject(event.target.error);
-        };
-      });
-    }
+      request.onerror = (event) => {
+        reject(event.target.error);
+      };
+    });
   };
 
-  // Implement other methods like get, update, delete as needed
-
-  return { db, addData };
+  return { db, putData };
 };
 
 export const getAllData = (storeName) => {
