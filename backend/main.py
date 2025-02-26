@@ -1,6 +1,7 @@
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi import Body
 import pandas as pd
 import io
 import ast
@@ -8,7 +9,7 @@ import logging
 import base64
 import pickle
 from WingWatch.Equipment import station, antenna
-
+import json
 
 app = FastAPI()
 
@@ -53,81 +54,107 @@ def safe_literal_eval(value):
 
 
 
-@app.post("/process-csv/")
-async def process_csv(
-    stationName: str = Form(...),
-    latitude: float = Form(...),
-    longitude: float = Form(...),
-    antennaNumber: int = Form(...),
-    antennas: str = Form(...),  
-    csv_file: UploadFile = File(...)
-):
-    print(f"Received Data: stationName={stationName}, latitude={latitude}, longitude={longitude}, antennas={antennas}, antennaNumber={antennaNumber}")
+# @app.post("/process-csv/")
+# async def process_csv(
+#     stationName: str = Body(...),
+#     latitude: float = Body(...),
+#     longitude: float = Body(...),
+#     antennaNumber: int = Body(...),
+#     antennas: list = Body(...),  
+#     csv_file: UploadFile = File(...)
+# ):
+#     print(f"Received Data: stationName={stationName}, latitude={latitude}, longitude={longitude}, antennas={antennas}, antennaNumber={antennaNumber}")
 
-    try:
+#     try:
 
-        print(f"Converting Antennas to a list")
+#         print(f"Converting Antennas to a list")
 
-        print(antennas)
-        # Convert antennas from JSON string to list
+#         print(antennas)
+#         # Convert antennas from JSON string to list
 
-        antennas_list = safe_literal_eval(antennas) 
+#         antennas_list = json.loads(antennas)
 
-        print(type(antennas_list))
-        print(f"Antennas converted")
+#         print(type(antennas_list))
+#         print(f"Antennas converted")
 
-        try:
-            print(f"Checking file: {csv_file.filename}")
+#         try:
+#             print(f"Checking file: {csv_file.filename}")
             
-            if not csv_file:
-                return JSONResponse({"error": "No file uploaded"}, status_code=400)
+#             if not csv_file:
+#                 return JSONResponse({"error": "No file uploaded"}, status_code=400)
 
-            print(f"Reading CSV file")
-            contents = await csv_file.read()
-            print(f"Read {len(contents)} bytes")
+#             print(f"Reading CSV file")
+#             contents = await csv_file.read()
+#             print(f"Read {len(contents)} bytes")
 
-            df = pd.read_csv(io.StringIO(contents.decode("utf-8")))
-            print(f"CSV successfully loaded into DataFrame with {df.shape[0]} rows and {df.shape[1]} columns")
-        except Exception as e:
-            print(f"Error reading CSV file: {str(e)}")
+#             df = pd.read_csv(io.StringIO(contents.decode("utf-8")))
+#             print(f"CSV successfully loaded into DataFrame with {df.shape[0]} rows and {df.shape[1]} columns")
+#         except Exception as e:
+#             print(f"Error reading CSV file: {str(e)}")
 
-        pattern = pd.read_csv(io.StringIO(contents.decode("utf-8")))
+#         pattern = pd.read_csv(io.StringIO(contents.decode("utf-8")))
 
-        print(f"Pattern read")
+#         print(f"Pattern read")
 
-        # Create station
-        Station_1 = station.Station(stationName, latitude, longitude,antennas=antennas_list)
+#         # Create station
+#         Station_1 = station.Station(stationName, latitude, longitude,antennas=antennas_list)
         
-        print(f"Station created")
+#         print(f"Station created")
 
-        # Create and assign antenna
-        a1 = antenna.Antenna(antennaNumber, 'test', 0, 0)
-        a1.assign_pattern(pattern)
-
-
-        print(f"Antenna created and pattern assigned")
-
-        print(f"Adding antenna {int(antennaNumber)} to station")
-        Station_1.add_antenna(a1,antenna_number=int(antennaNumber))
-        print(f"Antenna added to station")
-
-        for i in range(len(Station_1.antennas)): 
-            if not isinstance(Station_1.antennas[i], str):
-                Station_1.antennas[i] = object_to_base64_string(Station_1.antennas[i])
-        print(f"Antennas Patterns processed to Base64")
+#         # Create and assign antenna
+#         a1 = antenna.Antenna(antennaNumber, 'test', 0, 0)
+#         a1.assign_pattern(pattern)
 
 
-        # Return processed data along with station info
+#         print(f"Antenna created and pattern assigned")
+
+#         print(f"Adding antenna {int(antennaNumber)} to station")
+#         Station_1.add_antenna(a1,antenna_number=int(antennaNumber))
+#         print(f"Antenna added to station")
+
+#         for i in range(len(Station_1.antennas)): 
+#             if not isinstance(Station_1.antennas[i], str):
+#                 Station_1.antennas[i] = object_to_base64_string(Station_1.antennas[i])
+#         print(f"Antennas Patterns processed to Base64")
+
+
+#         # Return processed data along with station info
+#         return JSONResponse({
+#             "stationName": Station_1.name,
+#             "latitude": Station_1.lat,
+#             "longitude": Station_1.long,
+#             "antennas": Station_1.antennas  # Ensure antennas is a list
+#         })
+
+#     except Exception as e:
+#         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.post("/process-csv/")
+async def process_csv(data: dict):
+    try:
+        #print("Received Data:", data)
+        
+        # Decode Base64 CSV file
+        csv_bytes = base64.b64decode(data["csv_base64"])
+        df = pd.read_csv(io.StringIO(csv_bytes.decode("utf-8")))
+
+        # Create station and antenna
+        Station_1 = station.Station(data["stationName"], data["latitude"], data["longitude"], antennas=data["antennas"])
+        a1 = antenna.Antenna(data["antennaNumber"], 'test', 0, 0)
+        a1.assign_pattern(df)
+
+        Station_1.add_antenna(a1, antenna_number=int(data["antennaNumber"]))
+
         return JSONResponse({
             "stationName": Station_1.name,
             "latitude": Station_1.lat,
             "longitude": Station_1.long,
-            "antennas": Station_1.antennas  # Ensure antennas is a list
+            "antennas": Station_1.antennas
         })
 
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
-
 
 
 

@@ -19,13 +19,13 @@ export default function InputStationData({ refreshMarkers }) {
         latitude: '',
         longitude: '',
         antennaNumber: '',
-        antennas: '',
-        csvFile: null
+        antennas: [],
+        csvFile: null,
+        csvBase64: ''
     });
 
     const [stations, setStations] = useState([]);
 
-    // Fetch existing stations from IndexedDB
     useEffect(() => {
         const fetchStations = async () => {
             try {
@@ -43,11 +43,9 @@ export default function InputStationData({ refreshMarkers }) {
         const selectedStationId = e.target.value;
     
         try {
-            // Fetch the latest stations from IndexedDB
             const updatedStations = await getAllData("yourStoreName");
             setStations(updatedStations);
     
-            // Find the selected station
             const selectedStation = updatedStations.find(station => station.id === selectedStationId);
     
             if (selectedStation) {
@@ -63,8 +61,6 @@ export default function InputStationData({ refreshMarkers }) {
             console.error("Error fetching updated stations:", error);
         }
     };
-    
-    
 
     const handleChangeStationInit = (e) => {
         setStationData({ ...stationData, [e.target.name]: e.target.value });
@@ -72,7 +68,18 @@ export default function InputStationData({ refreshMarkers }) {
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
-        setStationData({ ...stationData, csvFile: file });
+
+        if (file) {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => {
+                setStationData(prevState => ({
+                    ...prevState,
+                    csvFile: file,
+                    csvBase64: reader.result.split(',')[1]  // Extract base64 part
+                }));
+            };
+        }
     };
 
     const handleSave = async () => {
@@ -86,15 +93,13 @@ export default function InputStationData({ refreshMarkers }) {
             latitude: parseFloat(stationData.latitude),
             longitude: parseFloat(stationData.longitude),
             antennaNumber: stationData.antennaNumber,
-            antennas: '[]' // Ensure empty list on initialization
+            antennas: []
         };
     
         try {
             await putData(dataToSave);
             console.log("Data saved:", dataToSave);
-            refreshMarkers(); // Refresh map after saving
-            
-            // Re-fetch updated stations from IndexedDB
+            refreshMarkers(); 
             const updatedStations = await getAllData("yourStoreName");
             setStations(updatedStations);
     
@@ -104,37 +109,26 @@ export default function InputStationData({ refreshMarkers }) {
     };
 
     const handleSubmit = async () => {
-        if (!stationData.csvFile) return;
-    
-        const formData = new FormData();
-        formData.append("stationName", stationData.stationName);
-        formData.append("latitude", parseFloat(stationData.latitude));  
-        formData.append("longitude", parseFloat(stationData.longitude)); 
-        formData.append("antennaNumber", parseInt(stationData.antennaNumber, 10));
-        formData.append("antennas", JSON.stringify(stationData.antennas));
+        if (!stationData.csvBase64) return;
 
+        const requestBody = {
+            stationName: stationData.stationName,
+            latitude: parseFloat(stationData.latitude),
+            longitude: parseFloat(stationData.longitude),
+            antennaNumber: parseInt(stationData.antennaNumber, 10),
+            antennas: stationData.antennas,
+            csv_base64: stationData.csvBase64
+        };
 
-        formData.append("csv_file", stationData.csvFile);
-
-
-
-        console.log("Selected File:", stationData.csvFile);
-        if (stationData.csvFile) {
-            console.log("File Name:", stationData.csvFile.name);
-            console.log("File Type:", stationData.csvFile.type);
-            console.log("File Size:", stationData.csvFile.size);
-}
-    
-        console.log("Submitting FormData...");
-    
-        for (let pair of formData.entries()) {
-            console.log(pair[0] + ': ' + pair[1]);
-        }
+        console.log("Submitting JSON request body:", requestBody);
     
         try {          
             const response = await fetch("http://localhost:8000/process-csv/", {
                 method: "POST",
-                body: formData,
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(requestBody),
             });
     
             if (!response.ok) throw new Error("Failed to process CSV");
@@ -142,7 +136,6 @@ export default function InputStationData({ refreshMarkers }) {
             const data = await response.json();
             console.log("Processed Data:", data);
     
-            // Save processed data
             await putData({
                 id: data.stationName,
                 latitude: data.latitude,
@@ -213,7 +206,7 @@ export default function InputStationData({ refreshMarkers }) {
                 variant="contained" 
                 onClick={handleSubmit} 
                 fullWidth 
-                disabled={!stationData.csvFile}
+                disabled={!stationData.csvBase64}
             >
                 Submit
             </Button>
