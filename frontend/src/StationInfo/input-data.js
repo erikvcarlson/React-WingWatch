@@ -9,33 +9,35 @@ import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
 import InputLabel from '@mui/material/InputLabel';
 import FormControl from '@mui/material/FormControl';
-import { useIndexedDB, getAllData } from "../indexeddb/useIndexedDB";
+import { useIndexedDB, getAllData,putData } from "../indexeddb/useIndexedDB";
+import {v4 as uuidv4} from 'uuid';
+
 
 export default function InputStationData({ refreshMarkers }) {
-    const { putData } = useIndexedDB("yourStoreName");
+    const { stationDB,antennaDB,patternDB } = useIndexedDB();
 
     const [stationData, setStationData] = useState({
         stationName: '',
         latitude: '',
-        longitude: '',
-        antennaNumber: '',
-        antennas: [],
-        csvFile: null,
-        csvBase64: ''
+        longitude: ''
     });
+
+
+    const fetchStations = async () => {
+        try {
+            const data = await getAllData("stations", stationDB);
+            console.log("Fetched stations:", data);
+            setStations(data);
+        } catch (error) {
+            console.error("Error fetching stations:", error);
+        }
+    };
+
+
 
     const [stations, setStations] = useState([]);
 
     useEffect(() => {
-        const fetchStations = async () => {
-            try {
-                const data = await getAllData("yourStoreName");
-                setStations(data);
-            } catch (error) {
-                console.error("Error fetching stations:", error);
-            }
-        };
-
         fetchStations();
     }, []);
 
@@ -43,7 +45,8 @@ export default function InputStationData({ refreshMarkers }) {
         const selectedStationId = e.target.value;
     
         try {
-            const updatedStations = await getAllData("yourStoreName");
+                const data = await getAllData("stations",stationDB);
+                const updatedStations = await getAllData("stations",stationDB);
             setStations(updatedStations);
     
             const selectedStation = updatedStations.find(station => station.id === selectedStationId);
@@ -54,7 +57,6 @@ export default function InputStationData({ refreshMarkers }) {
                     stationName: selectedStation.id,
                     latitude: selectedStation.latitude,
                     longitude: selectedStation.longitude,
-                    antennas: selectedStation.antennas 
                 }));
             }
         } catch (error) {
@@ -87,20 +89,22 @@ export default function InputStationData({ refreshMarkers }) {
             console.error("Error: Name, Latitude, and Longitude are required.");
             return;
         }
-    
+        
+        const ident = uuidv4();
+
+
         const dataToSave = {
-            id: stationData.stationName,
+            id: ident,  // Use UUID as ID
+            stationName: stationData.stationName,
             latitude: parseFloat(stationData.latitude),
             longitude: parseFloat(stationData.longitude),
-            antennaNumber: stationData.antennaNumber,
-            antennas: []
         };
     
         try {
-            await putData(dataToSave);
+            await putData(dataToSave,stationDB,"stations");
             console.log("Data saved:", dataToSave);
             refreshMarkers(); 
-            const updatedStations = await getAllData("yourStoreName");
+            const updatedStations = await getAllData("stations",stationDB);
             setStations(updatedStations);
     
         } catch (error) {
@@ -109,43 +113,47 @@ export default function InputStationData({ refreshMarkers }) {
     };
 
     const handleSubmit = async () => {
-        if (!stationData.csvBase64) return;
-
-        const requestBody = {
-            stationName: stationData.stationName,
-            latitude: parseFloat(stationData.latitude),
-            longitude: parseFloat(stationData.longitude),
-            antennaNumber: parseInt(stationData.antennaNumber, 10),
-            antennas: stationData.antennas,
-            csv_base64: stationData.csvBase64
+        console.log("handleSubmit entered.");
+        if (!stationData.csvBase64 || !stationData.antennaNumber) return;
+    
+        const stationUUID = stationData.ident;
+        const antennaUUID = uuidv4();
+        const patternUUID = uuidv4();
+    
+        // Save the antenna entry
+        const antennaEntry = {
+            id: antennaUUID,
+            stationId: stationUUID,
+            antennaNumber: stationData.antennaNumber,
         };
-
-        console.log("Submitting JSON request body:", requestBody);
     
-        try {          
-            const response = await fetch("http://localhost:8000/process-csv/", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(requestBody),
-            });
+        try {
+            await putData(antennaEntry, antennaDB, "antennas");
+            console.log("Antenna entry saved:", antennaEntry);
     
-            if (!response.ok) throw new Error("Failed to process CSV");
-    
-            const data = await response.json();
-            console.log("Processed Data:", data);
-    
-            await putData({
-                id: data.stationName,
-                latitude: data.latitude,
-                longitude: data.longitude,
-                antennas: data.antennas,
-            });
+            // Decode and parse the CSV
+            const csvData = atob(stationData.csvBase64);
+            const rows = csvData.split("\n").slice(1);
+            
+            for (const row of rows) {
+                const [x, y, z, rssi] = row.split(",").map(val => val.trim());
+                if (x && y && z && rssi) {
+                    const patternEntry = {
+                        id: patternUUID,
+                        antennaId: antennaUUID,
+                        x: parseFloat(x),
+                        y: parseFloat(y),
+                        z: parseFloat(z),
+                        rssi: parseFloat(rssi)
+                    };
+                    await putData(patternEntry, patternDB, "patterns");
+                    console.log("Pattern entry saved:", patternEntry);
+                }
+            }
     
             refreshMarkers();
         } catch (error) {
-            console.error("Error submitting CSV:", error);
+            console.error("Error saving data:", error);
         }
     };
 
@@ -183,7 +191,7 @@ export default function InputStationData({ refreshMarkers }) {
                 >
                     {stations.map((station) => (
                         <MenuItem key={station.id} value={station.id}>
-                            {station.id}
+                            {station.stationName}
                         </MenuItem>
                     ))}
                 </Select>

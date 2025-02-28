@@ -9,31 +9,30 @@ import InputStationData from './StationInfo/input-data';
 import BasicMap from './Map/map'
 import Grid from '@mui/material/Grid';
 import { useState, useEffect } from 'react';
-import { getAllData } from './indexeddb/useIndexedDB'; // Import function to fetch data
+import { getAllData,useIndexedDB } from './indexeddb/useIndexedDB'; // Import function to fetch data
 import Switch from '@mui/material/Switch';  // Import Switch component
 import FormControlLabel from '@mui/material/FormControlLabel';
 import StationSelectionCard from './DetectionGenerator/Detection';
 
 
 export default function Dashboard() {
-
+  const { stationDB,antennaDB,patternDB } = useIndexedDB();
   const [markers, setMarkers] = useState([]);
   const [showMarkers, setShowMarkers] = useState(true); // State to control marker visibility
 
   // Function to fetch markers from IndexedDB
   const fetchMarkers = async () => {
     try {
-      const data = await getAllData("yourStoreName");
+      const data = await getAllData("stations",stationDB);
       setMarkers(data);
     } catch (error) {
       console.error("Error loading markers:", error);
     }
   };
 
-  // Fetch markers on mount
   useEffect(() => {
-    fetchMarkers();
-  }, []);
+    if (stationDB) fetchMarkers();
+  }, [stationDB]);
 
 
   return (
@@ -57,7 +56,7 @@ export default function Dashboard() {
       <Grid item xs={12} sm={6} md={4}> {/* Column 3, Row 1 */}
         <Card> {/* Added a Card for consistency */}
           <CardContent>
-            {/* <Typography variant="h6">Placeholder 1</Typography> Added a title */}
+          <Typography variant="h6">Placeholder 4</Typography>
             <StationSelectionCard />
           </CardContent>
         </Card>
@@ -72,6 +71,7 @@ export default function Dashboard() {
       <Grid item xs={12} sm={6} md={4}>
         <Card>
           <CardContent>
+          <CardContent>
             <Typography variant="h6">Map Properties and Layer Control</Typography>
             <FormControlLabel
               control={
@@ -82,6 +82,7 @@ export default function Dashboard() {
               }
               label={showMarkers ? "Hide Stations" : "Show Stations"}
             />
+          </CardContent>
           </CardContent>
         </Card>
       </Grid>
