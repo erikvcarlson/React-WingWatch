@@ -10,9 +10,12 @@ import FormControl from '@mui/material/FormControl';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
-import { getAllData } from "../indexeddb/useIndexedDB"; // Import IndexedDB helper function
+import { useIndexedDB, getAllData,putData } from "../indexeddb/useIndexedDB";
 
 export default function StationSelectionCard() {
+
+    const { stationDB,antennaDB,patternDB } = useIndexedDB();
+
     const [stations, setStations] = useState([]);
     const [formData, setFormData] = useState({
         station1: '',
@@ -28,9 +31,9 @@ export default function StationSelectionCard() {
 
     // Fetch stations from IndexedDB on mount
     useEffect(() => {
-        const fetchStations = async () => {
+        const fetchStations = async () => { 
             try {
-                const data = await getAllData("yourStoreName");
+                const data = await getAllData("stations", stationDB);
                 setStations(data);
             } catch (error) {
                 console.error("Error fetching stations:", error);

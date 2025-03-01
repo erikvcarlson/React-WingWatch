@@ -9,147 +9,113 @@ import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
 import InputLabel from '@mui/material/InputLabel';
 import FormControl from '@mui/material/FormControl';
-import { useIndexedDB, getAllData,putData } from "../indexeddb/useIndexedDB";
-import {v4 as uuidv4} from 'uuid';
-
+import { useIndexedDB, getAllData, putData } from "../indexeddb/useIndexedDB";
+import { v4 as uuidv4 } from 'uuid';
+import pako from 'pako';
 
 export default function InputStationData({ refreshMarkers }) {
-    const { stationDB,antennaDB,patternDB } = useIndexedDB();
+    const { stationDB, antennaDB, patternDB } = useIndexedDB();
 
     const [stationData, setStationData] = useState({
-        stationName: '',
+        id: '',
         latitude: '',
-        longitude: ''
+        longitude: '',
+        stationName: ''
     });
 
+    const [antennaData, setAntennaData] = useState({
+        antennaNumber: '',
+        stationId: '' // Initialize stationId
+    });
+
+    const [patternData, setPatternData] = useState({
+        csvBase64: '',
+        antennaId: ''
+    });
+
+    const [stations, setStations] = useState([]);
 
     const fetchStations = async () => {
         try {
             const data = await getAllData("stations", stationDB);
-            console.log("Fetched stations:", data);
             setStations(data);
         } catch (error) {
             console.error("Error fetching stations:", error);
         }
     };
 
-
-
-    const [stations, setStations] = useState([]);
-
     useEffect(() => {
         fetchStations();
     }, []);
 
-    const handleChangeAddPattern = async (e) => {
-        const selectedStationId = e.target.value;
-    
-        try {
-                const data = await getAllData("stations",stationDB);
-                const updatedStations = await getAllData("stations",stationDB);
-            setStations(updatedStations);
-    
-            const selectedStation = updatedStations.find(station => station.id === selectedStationId);
-    
-            if (selectedStation) {
-                setStationData(prevState => ({
-                    ...prevState,
-                    stationName: selectedStation.id,
-                    latitude: selectedStation.latitude,
-                    longitude: selectedStation.longitude,
-                }));
-            }
-        } catch (error) {
-            console.error("Error fetching updated stations:", error);
-        }
+    const handleChangeStation = (e) => {
+        setStationData({ ...stationData, [e.target.name]: e.target.value });
     };
 
-    const handleChangeStationInit = (e) => {
-        setStationData({ ...stationData, [e.target.name]: e.target.value });
+    const handleChangeAntenna = (e) => {
+        setAntennaData({ ...antennaData, [e.target.name]: e.target.value });
     };
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
-
         if (file) {
             const reader = new FileReader();
             reader.readAsDataURL(file);
             reader.onload = () => {
-                setStationData(prevState => ({
-                    ...prevState,
-                    csvFile: file,
-                    csvBase64: reader.result.split(',')[1]  // Extract base64 part
-                }));
+                setPatternData({ ...patternData, csvBase64: reader.result.split(',')[1] });
             };
         }
     };
 
-    const handleSave = async () => {
+    const handleSaveStation = async () => {
         if (!stationData.stationName || !stationData.latitude || !stationData.longitude) {
-            console.error("Error: Name, Latitude, and Longitude are required.");
+            console.error("Error: Station Name, Latitude, and Longitude are required.");
             return;
         }
-        
-        const ident = uuidv4();
 
+        const stationUUID = uuidv4();
+        const dataToSave = { ...stationData, id: stationUUID };
 
-        const dataToSave = {
-            id: ident,  // Use UUID as ID
-            stationName: stationData.stationName,
-            latitude: parseFloat(stationData.latitude),
-            longitude: parseFloat(stationData.longitude),
-        };
-    
         try {
-            await putData(dataToSave,stationDB,"stations");
-            console.log("Data saved:", dataToSave);
-            refreshMarkers(); 
-            const updatedStations = await getAllData("stations",stationDB);
-            setStations(updatedStations);
-    
+            await putData(dataToSave, stationDB, "stations");
+            console.log("Station saved:", dataToSave);
+            refreshMarkers();
+            fetchStations();
         } catch (error) {
-            console.error("Error saving data:", error);
+            console.error("Error saving station:", error);
         }
     };
 
     const handleSubmit = async () => {
-        console.log("handleSubmit entered.");
-        if (!stationData.csvBase64 || !stationData.antennaNumber) return;
+        if (!antennaData.antennaNumber || !patternData.csvBase64 || !antennaData.stationId) {
+            console.error("Error: Antenna number, CSV file, and Station selection are required.");
+            return;
+        }
     
-        const stationUUID = stationData.ident;
         const antennaUUID = uuidv4();
         const patternUUID = uuidv4();
     
-        // Save the antenna entry
         const antennaEntry = {
             id: antennaUUID,
-            stationId: stationUUID,
-            antennaNumber: stationData.antennaNumber,
+            stationId: antennaData.stationId, // Use antennaData.stationId
+            antennaNumber: antennaData.antennaNumber
         };
     
         try {
             await putData(antennaEntry, antennaDB, "antennas");
-            console.log("Antenna entry saved:", antennaEntry);
+            console.log("Antenna saved:", antennaEntry);
     
-            // Decode and parse the CSV
-            const csvData = atob(stationData.csvBase64);
-            const rows = csvData.split("\n").slice(1);
-            
-            for (const row of rows) {
-                const [x, y, z, rssi] = row.split(",").map(val => val.trim());
-                if (x && y && z && rssi) {
-                    const patternEntry = {
-                        id: patternUUID,
-                        antennaId: antennaUUID,
-                        x: parseFloat(x),
-                        y: parseFloat(y),
-                        z: parseFloat(z),
-                        rssi: parseFloat(rssi)
-                    };
-                    await putData(patternEntry, patternDB, "patterns");
-                    console.log("Pattern entry saved:", patternEntry);
-                }
-            }
+            const csvData = atob(patternData.csvBase64);
+            const compressedCsv = pako.deflate(csvData, { to: 'string' });
+    
+            const patternEntry = {
+                id: patternUUID,
+                antennaId: antennaUUID,
+                compressedCsv: compressedCsv
+            };
+    
+            await putData(patternEntry, patternDB, "patterns");
+            console.log("Pattern saved:", patternEntry);
     
             refreshMarkers();
         } catch (error) {
@@ -159,36 +125,14 @@ export default function InputStationData({ refreshMarkers }) {
 
     return (
         <Box component="form" sx={{ '& > :not(style)': { m: 1, width: '100%' } }} noValidate autoComplete="off">
-            <TextField 
-                label="Name of Station" 
-                name="stationName" 
-                value={stationData.stationName} 
-                onChange={handleChangeStationInit} 
-                fullWidth 
-            />
-            <TextField 
-                label="Latitude" 
-                name="latitude" 
-                value={stationData.latitude} 
-                onChange={handleChangeStationInit} 
-                fullWidth 
-            />
-            <TextField 
-                label="Longitude" 
-                name="longitude" 
-                value={stationData.longitude} 
-                onChange={handleChangeStationInit} 
-                fullWidth 
-            />
-            <Button variant="contained" onClick={handleSave} fullWidth>Generate</Button>
+            <TextField label="Name of Station" name="stationName" value={stationData.stationName} onChange={handleChangeStation} fullWidth />
+            <TextField label="Latitude" name="latitude" value={stationData.latitude} onChange={handleChangeStation} fullWidth />
+            <TextField label="Longitude" name="longitude" value={stationData.longitude} onChange={handleChangeStation} fullWidth />
+            <Button variant="contained" onClick={handleSaveStation} fullWidth>Save Station</Button>
 
             <FormControl fullWidth>
                 <InputLabel>Select a Station</InputLabel>
-                <Select
-                    value={stationData.stationName}
-                    name="stationName"
-                    onChange={handleChangeAddPattern}
-                >
+                <Select name="stationId" value={antennaData.stationId} onChange={handleChangeAntenna}>
                     {stations.map((station) => (
                         <MenuItem key={station.id} value={station.id}>
                             {station.stationName}
@@ -197,27 +141,13 @@ export default function InputStationData({ refreshMarkers }) {
                 </Select>
             </FormControl>
 
-            <TextField 
-                label="Antenna Number" 
-                name="antennaNumber" 
-                value={stationData.antennaNumber} 
-                onChange={handleChangeStationInit} 
-                fullWidth 
-            />
-
+            <TextField label="Antenna Number" name="antennaNumber" value={antennaData.antennaNumber} onChange={handleChangeAntenna} fullWidth />
             <Button variant="contained" component="label" fullWidth>
-                CSV for Pattern
+                Upload CSV for Pattern
                 <input type="file" hidden accept=".csv" onChange={handleFileChange} />
             </Button>
 
-            <Button 
-                variant="contained" 
-                onClick={handleSubmit} 
-                fullWidth 
-                disabled={!stationData.csvBase64}
-            >
-                Submit
-            </Button>
+            <Button variant="contained" onClick={handleSubmit} fullWidth>Submit Pattern</Button>
         </Box>
     );
 }

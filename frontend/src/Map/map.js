@@ -40,12 +40,12 @@ export default function BasicMap({ markers }) {
             <MarkerClusterGroup chunkedLoading>
                 {markers.map((marker) => (
                     <Marker
-                        key={marker.id}
+                        key={marker.stationName}
                         position={[marker.latitude, marker.longitude]}
                         icon={customIcon}
                     >
                         <Popup>
-                            {marker.id || "Saved Location"}
+                            {marker.stationName || "Saved Location"}
                         </Popup>
                     </Marker>
                 ))}

@@ -24,6 +24,7 @@ export default function Dashboard() {
   const fetchMarkers = async () => {
     try {
       const data = await getAllData("stations",stationDB);
+      console.log("Fetched markers:", data);
       setMarkers(data);
     } catch (error) {
       console.error("Error loading markers:", error);
