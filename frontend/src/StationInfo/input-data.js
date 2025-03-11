@@ -34,19 +34,29 @@ export default function InputStationData({ refreshMarkers }) {
     });
 
     const [stations, setStations] = useState([]);
-
+    const [loadingStations, setLoadingStations] = useState(true);
+    
     const fetchStations = async () => {
+        if (!stationDB) {
+            console.warn("Station database not ready yet.");
+            return;
+        }
         try {
             const data = await getAllData("stations", stationDB);
             setStations(data);
         } catch (error) {
             console.error("Error fetching stations:", error);
+        } finally {
+            setLoadingStations(false);
         }
     };
-
+    
     useEffect(() => {
-        fetchStations();
-    }, []);
+        if (stationDB) {
+            fetchStations();
+        }
+    }, [stationDB]);
+    
 
     const handleChangeStation = (e) => {
         setStationData({ ...stationData, [e.target.name]: e.target.value });
@@ -131,8 +141,13 @@ export default function InputStationData({ refreshMarkers }) {
             <Button variant="contained" onClick={handleSaveStation} fullWidth>Save Station</Button>
 
             <FormControl fullWidth>
-                <InputLabel>Select a Station</InputLabel>
-                <Select name="stationId" value={antennaData.stationId} onChange={handleChangeAntenna}>
+                <InputLabel id="station-select-label">Select a Station</InputLabel>
+                <Select
+                    labelId="station-select-label"
+                    name="stationId"
+                    value={antennaData.stationId}
+                    onChange={handleChangeAntenna}
+                >
                     {stations.map((station) => (
                         <MenuItem key={station.id} value={station.id}>
                             {station.stationName}
