@@ -28,16 +28,19 @@ export default function StationSelectionCard() {
         strength3: ''
     });
 
+    const fetchStations = async () => {
+        try {
+            const data = await getAllData("stations", stationDB);
+            setStations(data);
+        } catch (error) {
+            console.error("Error fetching stations:", error);
+        }
+    };
+
     useEffect(() => {
-        const fetchStations = async () => {
-            try {
-                const data = await getAllData("stations", stationDB);
-                setStations(data);
-            } catch (error) {
-                console.error("Error fetching stations:", error);
-            }
-        };
-        fetchStations();
+        if (stationDB) {
+            fetchStations();
+        }
     }, [stationDB]);
 
     const handleChange = (e) => {
@@ -48,13 +51,15 @@ export default function StationSelectionCard() {
         console.log("Fetching pattern for station:", stationId, "antenna:", antennaNumber);
         try {
             const antennas = await getAllData("antennas", antennaDB);
-            const antenna = antennas.find((a) => a.stationId === stationId && a.number === antennaNumber);
+            
+        
+            const antenna = antennas.find((a) => a.stationId === stationId && a.antennaNumber === antennaNumber.toString());
             
             if (antenna) {
                 const patterns = await getAllData("patterns", patternDB);
                 const pattern = patterns.find((p) => p.antennaId === antenna.id);
                 console.log(antenna.id);
-                return pattern ? pattern.csvBase64 : null;
+                return pattern ? pattern.compressedCsv : null;
             }
         } catch (error) {
             console.error("Error fetching antenna pattern:", error);
@@ -63,17 +68,23 @@ export default function StationSelectionCard() {
     };
 
     const handleGo = async () => {
+        console.log("Starting Payload Collection");
+
         const payload = await Promise.all(
             [1, 2, 3].map(async (num) => {
                 const station = stations.find((s) => s.id === formData[`station${num}`]);
-                const patternCsv = await fetchAntennaPattern(formData[`station${num}`], formData[`antenna${num}`]);
+                const compressedCsv = await fetchAntennaPattern(formData[`station${num}`], formData[`antenna${num}`]);
                 
+                const base64Csv = arrayBufferToBase64(compressedCsv);
+                
+                // at some point I MIGHT need to pass the antenna number to the API here. 
+
                 if (station) {
                     return {
                         stationName: station.stationName,
                         latitude: station.latitude,
                         longitude: station.longitude,
-                        patternCsv: patternCsv,
+                        compressedCsv: base64Csv,
                         strength: formData[`strength${num}`]
                     };
                 }
@@ -82,7 +93,38 @@ export default function StationSelectionCard() {
         );
 
         console.log("Payload to send:", payload);
+
+        try {
+            const response = await fetch('http://0.0.0.0:8000/generate-region', {
+               method: 'POST',
+                headers: {
+                  'Accept': 'application/json',
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({payload})
+
+            });
+            if (response.ok) {
+                const result = await response.json();
+                console.log("API Response:", result);
+            } else {
+                console.error("Failed to send payload:", response.statusText);
+            }
+        } catch (error) {
+            console.error("Error sending payload:", error);
+        };
     };
+
+    // Helper function for efficient Base64 encoding
+    function arrayBufferToBase64(buffer) {
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return btoa(binary);
+    }
 
     return (
         <Card>
