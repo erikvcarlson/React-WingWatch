@@ -16,7 +16,7 @@ from WingWatch.Intersections.detection import Detection
 from WingWatch.Intersections import tri
 import scipy.spatial as ss
 from WingWatch.Tools import translation
-
+import numpy as np
 
 app = FastAPI()
 
@@ -83,7 +83,7 @@ async def process_csv(payload: Payload):
         a1.assign_pattern(pattern3)
         station3.add_antenna(a1,int(antenna_number))
 
-
+        print('Stations and Pattern Created')
 
         det1 = Detection(station1,int(payload.payload[0].strength),1)
         det2 = Detection(station2,int(payload.payload[1].strength),1)
@@ -92,10 +92,18 @@ async def process_csv(payload: Payload):
         data_to_send_through = [det1,det2,det3]
         intersections,hull_of_intersections = tri.overlap_of_three_radiation_patterns(data_to_send_through)
 
-        translation.convert_back_to_lla()
-        print(intersections)
-        return intersections
 
+        r = (hull_of_intersections.volume * 3/4/np.pi)**(1/3)
+
+
+        intersections_mean = np.mean(intersections,axis=0)
+        intersection_mean_lla= translation.convert_back_to_lla(intersections_mean,float(payload.payload[0].latitude),float(payload.payload[0].longitude),0)
+            
+        print('Intersection Radius:', r)
+
+        print('Intersection Center:', intersection_mean_lla)
+        
+        return intersection_mean_lla,r
 
     except Exception as e:
         print(e)

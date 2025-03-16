@@ -1,6 +1,6 @@
 import 'leaflet/dist/leaflet.css';
 import "../styles.css";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import { useEffect } from 'react';
 import L from 'leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
@@ -28,7 +28,7 @@ function AutoZoom({ markers }) {
     return null;
 }
 
-export default function BasicMap({ markers }) {
+export default function BasicMap({ markers, detectionArea }) {
     return (
         <MapContainer center={[41.173889, -71.577393]} zoom={13} scrollWheelZoom={false} style={{ height: "500px", width: "100%" }}>
             <TileLayer
@@ -49,6 +49,18 @@ export default function BasicMap({ markers }) {
                         </Popup>
                     </Marker>
                 ))}
+
+            {detectionArea.radius && (
+                    <Circle
+                        center={[detectionArea.latitude, detectionArea.longitude]}
+                        radius={detectionArea.radius}
+                        color="blue"
+                        fillOpacity={0.3}
+                    >
+                        <Popup>Detection Radius: {detectionArea.radius} meters</Popup>
+                    </Circle>
+                )}
+
             </MarkerClusterGroup>
         </MapContainer>
     );

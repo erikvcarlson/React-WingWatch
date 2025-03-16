@@ -16,15 +16,14 @@ import StationSelectionCard from './DetectionGenerator/Detection';
 
 
 export default function Dashboard() {
-  const { stationDB,antennaDB,patternDB } = useIndexedDB();
+  const { stationDB } = useIndexedDB();
   const [markers, setMarkers] = useState([]);
-  const [showMarkers, setShowMarkers] = useState(true); // State to control marker visibility
+  const [showMarkers, setShowMarkers] = useState(true);
+  const [detectionArea, setDetectionArea] = useState([]); 
 
-  // Function to fetch markers from IndexedDB
   const fetchMarkers = async () => {
     try {
-      const data = await getAllData("stations",stationDB);
-      console.log("Fetched markers:", data);
+      const data = await getAllData("stations", stationDB);
       setMarkers(data);
     } catch (error) {
       console.error("Error loading markers:", error);
@@ -35,68 +34,46 @@ export default function Dashboard() {
     if (stationDB) fetchMarkers();
   }, [stationDB]);
 
-
   return (
     <Grid container spacing={2}>
-      <Grid item xs={12} sm={6} md={4}> {/* Column 1, Row 1 */}
+      <Grid item xs={12} sm={6} md={4}>
         <Card>
           <CardContent>
-            <Typography variant="h6">Station Creation Terminal  </Typography>
+            <Typography variant="h6">Station Creation Terminal</Typography>
             <InputStationData refreshMarkers={fetchMarkers} />
-          </CardContent>
-        </Card>
-      </Grid>
-      <Grid item xs={12} sm={6} md={4}> {/* Column 2, Row 1 */}
-        <Card>
-          <CardContent>
-            <Typography variant="h6">Map</Typography>
-            <BasicMap markers={showMarkers ? markers : []} /> {/* Pass empty array if hidden */}
-          </CardContent>
-        </Card>
-      </Grid>
-      <Grid item xs={12} sm={6} md={4}> {/* Column 3, Row 1 */}
-        <Card> {/* Added a Card for consistency */}
-          <CardContent>
-          <Typography variant="h6">Placeholder 4</Typography>
-            <StationSelectionCard />
-          </CardContent>
-        </Card>
-      </Grid>
-      <Grid item xs={12} sm={6} md={4}> {/* Column 1, Row 2 */}
-        <Card> {/* Added a Card for consistency */}
-          <CardContent>
-            <Typography variant="h6">Placeholder 2</Typography> {/* Added a title */}
           </CardContent>
         </Card>
       </Grid>
       <Grid item xs={12} sm={6} md={4}>
         <Card>
           <CardContent>
-          <CardContent>
-            <Typography variant="h6">Map Properties and Layer Control</Typography>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={showMarkers}
-                  onChange={() => setShowMarkers(!showMarkers)}
-                />
-              }
-              label={showMarkers ? "Hide Stations" : "Show Stations"}
-            />
-          </CardContent>
+            <Typography variant="h6">Map</Typography>
+            <BasicMap markers={showMarkers ? markers : []} detectionArea={detectionArea} />
           </CardContent>
         </Card>
       </Grid>
-      <Grid item xs={12} sm={6} md={4}> {/* Column 3, Row 2 (Empty) */}
+      <Grid item xs={12} sm={6} md={4}>
         <Card>
           <CardContent>
-            <Typography variant="h6">Placeholder 4</Typography>
+            <Typography variant="h6">Detection Generator</Typography>
+            <StationSelectionCard setDetectionArea={setDetectionArea} />
+          </CardContent>
+        </Card>
+      </Grid>
+      <Grid item xs={12} sm={6} md={4}>
+        <Card>
+          <CardContent>
+            <Typography variant="h6">Map Properties and Layer Control</Typography>
+            <FormControlLabel
+              control={<Switch checked={showMarkers} onChange={() => setShowMarkers(!showMarkers)} />}
+              label={showMarkers ? "Hide Stations" : "Show Stations"}
+            />
           </CardContent>
         </Card>
       </Grid>
     </Grid>
   );
-  }
+}
 
 
 

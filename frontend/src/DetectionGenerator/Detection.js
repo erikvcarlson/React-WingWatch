@@ -11,8 +11,11 @@ import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
 import { useIndexedDB, getAllData } from "../indexeddb/useIndexedDB";
+import BasicMap from '../Map/map'
 
-export default function StationSelectionCard() {
+
+
+export default function StationSelectionCard({ setDetectionArea }) {
     const { stationDB, antennaDB, patternDB } = useIndexedDB();
 
     const [stations, setStations] = useState([]);
@@ -27,6 +30,9 @@ export default function StationSelectionCard() {
         antenna3: '',
         strength3: ''
     });
+
+    const [detectionArea] = useState([]);
+
 
     const fetchStations = async () => {
         try {
@@ -67,18 +73,17 @@ export default function StationSelectionCard() {
         return null;
     };
 
+
     const handleGo = async () => {
         console.log("Starting Payload Collection");
-
+    
         const payload = await Promise.all(
             [1, 2, 3].map(async (num) => {
                 const station = stations.find((s) => s.id === formData[`station${num}`]);
                 const compressedCsv = await fetchAntennaPattern(formData[`station${num}`], formData[`antenna${num}`]);
                 
                 const base64Csv = arrayBufferToBase64(compressedCsv);
-                
-                // at some point I MIGHT need to pass the antenna number to the API here. 
-
+    
                 if (station) {
                     return {
                         stationName: station.stationName,
@@ -91,28 +96,52 @@ export default function StationSelectionCard() {
                 return null;
             })
         );
-
+    
         console.log("Payload to send:", payload);
-
+    
         try {
             const response = await fetch('http://0.0.0.0:8000/generate-region', {
-               method: 'POST',
+                method: 'POST',
                 headers: {
-                  'Accept': 'application/json',
-                  'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({payload})
-
+                body: JSON.stringify({ payload })
             });
+    
             if (response.ok) {
                 const result = await response.json();
                 console.log("API Response:", result);
+    
+            // Update map data with API response
+            // Process the response to extract lat/lng
+            if (Array.isArray(result) && result.length > 0) {
+                const areaCoords = result.map((item) => {
+                    if (Array.isArray(item) && item.length === 2) {
+                        const [point, radius] = item;
+                        if (Array.isArray(point) && point.length >= 2) {
+                            return {
+                                latitude: point[0],
+                                longitude: point[1],
+                                elevation: point[2] || 0,  // Handle elevation if needed
+                                radius: radius              // Include the radius
+                            };
+                        }
+                    }
+                    return null;
+                }).filter(Boolean);
+            
+                console.log("Detection Area Generated:", areaCoords);
+                setDetectionArea(areaCoords);
+                console.log(detectionArea && detectionArea.length > 2);
+            }            
+            
             } else {
                 console.error("Failed to send payload:", response.statusText);
             }
         } catch (error) {
             console.error("Error sending payload:", error);
-        };
+        }
     };
 
     // Helper function for efficient Base64 encoding
