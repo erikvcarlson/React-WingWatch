@@ -12,6 +12,7 @@ import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
 import { useIndexedDB, getAllData } from "../indexeddb/useIndexedDB";
 import BasicMap from '../Map/map'
+import { radioGroupClasses } from '@mui/material';
 
 
 
@@ -81,8 +82,8 @@ export default function StationSelectionCard({ setDetectionArea }) {
             [1, 2, 3].map(async (num) => {
                 const station = stations.find((s) => s.id === formData[`station${num}`]);
                 const compressedCsv = await fetchAntennaPattern(formData[`station${num}`], formData[`antenna${num}`]);
-                
-                const base64Csv = arrayBufferToBase64(compressedCsv);
+    
+                const base64Csv = compressedCsv ? arrayBufferToBase64(compressedCsv) : null;
     
                 if (station) {
                     return {
@@ -113,29 +114,19 @@ export default function StationSelectionCard({ setDetectionArea }) {
                 const result = await response.json();
                 console.log("API Response:", result);
     
-            // Update map data with API response
-            // Process the response to extract lat/lng
-            if (Array.isArray(result) && result.length > 0) {
-                const areaCoords = result.map((item) => {
-                    if (Array.isArray(item) && item.length === 2) {
-                        const [point, radius] = item;
-                        if (Array.isArray(point) && point.length >= 2) {
-                            return {
-                                latitude: point[0],
-                                longitude: point[1],
-                                elevation: point[2] || 0,  // Handle elevation if needed
-                                radius: radius              // Include the radius
-                            };
-                        }
-                    }
-                    return null;
-                }).filter(Boolean);
-            
+                const latLongCoords = result[0];
+                const radius = result[1]; // Ensure 'radius' is declared with 'const'
+    
+                const areaCoords = {
+                    latitude: latLongCoords[0],
+                    longitude: latLongCoords[1],
+                    elevation: latLongCoords[2],
+                    radius: radius
+                };
+    
                 console.log("Detection Area Generated:", areaCoords);
-                setDetectionArea(areaCoords);
+                setDetectionArea(areaCoords); // Correct state update
                 console.log(detectionArea && detectionArea.length > 2);
-            }            
-            
             } else {
                 console.error("Failed to send payload:", response.statusText);
             }
