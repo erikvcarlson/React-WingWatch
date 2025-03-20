@@ -30,7 +30,7 @@ you should get a command that the frontend was compiled successfully and you can
 
 http://localhost:3000
 
-For the applet to work, you also need to run the backend. In a new terminal, you will need to move into the backend directory and install the required packages using the python requirements file. 
+For the applet to work, you also need to run the backend. In a new terminal, you will need to move into the backend directory and install the required packages using the python requirements file.
 
 ```shell
 cd backend
@@ -48,6 +48,13 @@ You should get a line that says:
 ```shell
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
 ```
+
+If you get an error regarding geos_c or libgeos, you may need to install it manually:
+
+```shell
+sudo apt install libgeos-dev
+```
+
 ## Reporting an Issue
 To report an issue, use the Issues tab in Github. Please provide the most robust information as possible. Helpful information and attachments includes: 
 
