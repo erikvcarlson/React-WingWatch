@@ -41,7 +41,6 @@ export default function InputStationData({ refreshMarkers }) {
         return Number(n) === n && n % 1 !== 0;
     }
 
-
     const fetchStations = async () => {
         if (!stationDB) {
             console.warn("Station database not ready yet.");
@@ -69,7 +68,19 @@ export default function InputStationData({ refreshMarkers }) {
     };
 
     const handleChangeAntenna = (e) => {
-        setAntennaData({ ...antennaData, [e.target.name]: e.target.value });
+        const selectedStationId = e.target.value;
+        setAntennaData({ ...antennaData, stationId: selectedStationId });
+    
+        // Find the selected station from the stations array
+        const selectedStation = stations.find(station => station.id === selectedStationId);
+        if (selectedStation) {
+            setStationData({
+                id: selectedStation.id,
+                stationName: selectedStation.stationName,
+                latitude: selectedStation.latitude,
+                longitude: selectedStation.longitude
+            });
+        }
     };
 
     const handleFileChange = (e) => {
@@ -120,6 +131,12 @@ export default function InputStationData({ refreshMarkers }) {
     const handleSubmit = async () => {
         if (!antennaData.antennaNumber || !patternData.csvBase64 || !antennaData.stationId) {
             console.error("Error: Antenna number, CSV file, and Station selection are required.");
+            return;
+        }
+
+        if (!Number.isInteger(antennaData.antennaNumber)){
+            alert('The Antenna Number needs to be an Integer');
+            console.error("The Antenna Number needs to be an Integer");
             return;
         }
     
