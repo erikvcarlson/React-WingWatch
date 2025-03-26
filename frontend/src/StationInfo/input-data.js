@@ -36,6 +36,12 @@ export default function InputStationData({ refreshMarkers }) {
     const [stations, setStations] = useState([]);
     const [loadingStations, setLoadingStations] = useState(true);
     
+
+    function isFloat(n){
+        return Number(n) === n && n % 1 !== 0;
+    }
+
+
     const fetchStations = async () => {
         if (!stationDB) {
             console.warn("Station database not ready yet.");
@@ -79,9 +85,24 @@ export default function InputStationData({ refreshMarkers }) {
 
     const handleSaveStation = async () => {
         if (!stationData.stationName || !stationData.latitude || !stationData.longitude) {
+            alert('Error: Station Name, Latitude, and Longitude are required.');
             console.error("Error: Station Name, Latitude, and Longitude are required.");
             return;
         }
+
+
+        if (stationData.latitude > 90 || stationData.latitude < -90 || !isFloat(stationData.latitude) ){
+            alert('Invalid value for Latitude was Entered.');
+            console.error("Nonsensical Value for Latitude Entered");
+            return;
+        }
+
+        if (stationData.longitude > 180 || stationData.longitude < -180 || !isFloat(stationData.longitude) ){
+            alert('Invalid value for Longitude was Entered.');
+            console.error("Nonsensical Value for Longitude Entered");
+            return;
+        }
+
 
         const stationUUID = uuidv4();
         const dataToSave = { ...stationData, id: stationUUID };
