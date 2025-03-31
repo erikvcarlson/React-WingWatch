@@ -17,18 +17,14 @@ class Station:
         
     def add_antenna(self, antenna, antenna_number=None):
         # Default to appending if no specific number is given
-
         if antenna_number is None:
-            print("Antenna number was omitted. Appending antenna to the end of the list.")
             antenna_number = len(self.antennas)
 
         if not isinstance(antenna, ant.Antenna):
             print("Invalid antenna object. Please provide an Antenna instance.")
             return
-        print(type(self.antennas))
-        print(len(self.antennas))
+        
         if antenna_number-1 >= len(self.antennas):
-            print("There are more antennas than the number specified. Adding more null antennas to the list.")
             # Create a new list with the necessary size, copying over existing values
             new_antennas = [None] * (antenna_number)
             

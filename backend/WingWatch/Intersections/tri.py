@@ -109,12 +109,17 @@ def overlap_of_three_radiation_patterns(list_of_detections):
     
     '''
 
+    print('Started Station Shell Generation')
     #we need to grab the boundary points for each of the shells at the defined RSSI
     station_shells = generate_station_shells(list_of_detections)
-   
+    print('Station Shells Generated')
+
     #Once we have done that we can breakup the station shells data into three seperate components
+    print(f'The length of the shell 0 is: {len(station_shells[0])}')
     station_1_boundary = station_shells[0]
+    print(f'The length of the shell 1 is: {len(station_shells[1])}')
     station_2_boundary = station_shells[1]
+    print(f'The length of the shell 2 is: {len(station_shells[2])}')
     station_3_boundary = station_shells[2]
 
 
@@ -130,13 +135,23 @@ def overlap_of_three_radiation_patterns(list_of_detections):
 
 
     mesh = trimesh.convex.convex_hull(station_1_boundary)
+    print('Mesh 0 Generated')
     mesh_1 = trimesh.convex.convex_hull(station_2_boundary)
+    print('Mesh 1 Generated')
     mesh_2 = trimesh.convex.convex_hull(station_3_boundary)
-    mesh_above_ground = trimesh.convex.convex_hull(above_ground_boundary)
+    print('Mesh 2 Generated')
+    
+    
+    #mesh_above_ground = trimesh.convex.convex_hull(above_ground_boundary)
+    #print('Ground rejection Mesh Generated')
 
-    mesh4 = trimesh.boolean.intersection([mesh,mesh_1,mesh_2,mesh_above_ground])
+    #mesh4 = trimesh.boolean.intersection([mesh,mesh_1,mesh_2,mesh_above_ground])
 
+    mesh4 = trimesh.boolean.intersection([mesh,mesh_1,mesh_2])
+
+    print("The intersection has been generated.")
     intersections = mesh4.vertices
+    print(f'The number of verticies in the intersection is {len(intersections)}')
     hull_of_intersections = ss.ConvexHull(intersections)
 
     return intersections,hull_of_intersections
